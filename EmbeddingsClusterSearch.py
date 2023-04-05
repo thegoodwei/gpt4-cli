@@ -7,6 +7,47 @@ from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from typing import List, Tuple, Dict
+import tensorflow_hub as hub
+from nltk.tokenize import sent_tokenize
+
+# Load the Universal Sentence Encoder model
+embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
+
+def summarize_pages(pages: List[str]) -> List[float]:
+    """
+    Summarize the given pages using the Universal Sentence Encoder.
+
+    :param pages: A list of strings, where each string represents a page of text.
+    :return: A list of float values representing the sparse priming representation.
+    """
+    # Concatenate the pages into a single string
+    text = "\n\n".join(pages)
+
+    # Split the text into sentences
+    sentences = sent_tokenize(text)
+
+    # Encode the sentences using the Universal Sentence Encoder
+    sentence_embeddings = embed(sentences)
+
+    # Calculate the cosine similarity between each sentence and the others
+    similarity_matrix = np.inner(sentence_embeddings, sentence_embeddings)
+
+    # Calculate the average similarity score for each sentence
+    sentence_scores = np.mean(similarity_matrix, axis=1)
+
+    # Sort the sentences by score in descending order
+    sorted_sentences = sorted(enumerate(sentences), key=lambda x: sentence_scores[x[0]], reverse=True)
+
+    # Keep only the top 10% of the sentences
+    top_sentences = sorted_sentences[:int(len(sorted_sentences) * 0.1)]
+
+    # Create a sparse priming representation using the top sentences
+    priming = np.zeros(len(sentences))
+    for i, sentence in top_sentences:
+        priming[i] = 1.0 / len(top_sentences)
+
+    # Return the sparse priming representation
+    return priming.tolist()
 
 def load_csv(file_path):
     try:
